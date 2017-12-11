@@ -3,8 +3,11 @@ import RPi.GPIO as GPIO
 import time
 import serial
 import os
+import threading
 import os.path
 ser = ""
+ID = ""
+flag = False
 
 def setup():
 
@@ -13,34 +16,51 @@ def setup():
   print "*************************** \nIniciando AUDIOTECA DIGITAL 1.0 \n"
 
 def start():
-  Tag1 = str('0E0006989A0A')
+	global flag
+        global ID
+ 	while True:
+         if flag:
+	      flag = False
+              file = 'aplay ' + ID + '.wav'
+              ID = ""
+              os.system(file)
 
-  while True:
-    os.system("killall -9 aplay");
-    ser = serial.Serial('/dev/ttyAMA0',9600)
-    ID = ""
-    read_byte = ser.read()
-    if read_byte=="\x02":
-	os.system('killall -9 aplay')
-        for i in range(12):
-            read_byte = ser.read()
-            ID = ID + str(read_byte)
-        print "Code: "+ ID
-	ser.close()
-        print (os.path.isfile(ID + '.wav'))
 
-    if (os.path.isfile(ID + '.wav') ):
-       file = 'aplay ' + ID + '.wav'
-       os.system(file)
-       print "Success"
-       time.sleep(0.8)
+def scan ():
+	global flag
+        global ID
+	key = "0E0006989A0A"
+	while True:
+	    ser = serial.Serial('/dev/ttyAMA0',9600,timeout=0.20)
+	    read_byte = ser.read()
+            if read_byte=="\x02":
+              os.system('killall -9 aplay')
+	      flag = False
+              for i in range(12):
+                read_byte = ser.read()
+                ID = ID + str(read_byte)
+              print "Code: "+ ID
+              ser.close()
+	      if (ID == key):
+	        record()
+		ID = ""
+	      if (os.path.isfile(ID + '.wav')):
+		flag = True
+	      else:
+                ID = ""
+              time.sleep(0.8)
 
 def destroy():
    print ""
 
+def record():
+	print "recording"
+
 if __name__ == '__main__': # Program start from here
   setup()
   try:
+    sc = threading.Thread(target=scan, )
+    sc.start()
     start()
   except Exception as e:
    print (e)
